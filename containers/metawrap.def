@@ -1,0 +1,77 @@
+Bootstrap: docker
+From: continuumio/miniconda3:latest
+
+# To build this container image, use the command below on a Linux machine with Singularity:
+# sudo singularity build metawrap.sif metawrap.def
+
+%environment
+    # Set the path to the MetaWRAP conda environment
+    export LC_ALL=C
+    export PATH=/opt/conda/envs/metawrap/bin:$PATH
+
+%post
+    # 1. Update APT and install core dependencies
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        wget \
+        git \
+        bzip2 \
+        libncurses5 \
+        zlib1g-dev \
+        liblzma-dev \
+        build-essential && \
+    apt-get clean
+
+    # 2. Setup Conda environment for MetaWRAP
+    # REMOVED Python pin. Let the solver find the latest compatible version (likely 3.10-3.12).
+    /opt/conda/bin/conda create -n metawrap -y
+
+    # 3. Activate environment and install MetaWRAP and dependencies
+    # Use bioconda's metawrap-mg package (the metagenomics pipeline), not conda-forge metawrap (python decorator utility).
+    /opt/conda/bin/conda run -n metawrap conda install \
+        --channel bioconda \
+        --channel conda-forge \
+        --override-channels \
+        metawrap-mg \
+        maxbin2 \
+        metabat2 \
+        concoct \
+        checkm2 \
+        gtdbtk \
+        -y
+
+    # 3b. Publish a stable executable path for workflow calls.
+    ln -sf /opt/conda/envs/metawrap/bin/metawrap /usr/local/bin/metawrap
+
+    # 4. Clean up Conda caches to minimize final image size
+    /opt/conda/bin/conda clean -a -y
+
+%runscript
+    # The default command when running the container (exec / run)
+    exec /usr/local/bin/metawrap "$@"
+
+%labels
+Maintainer lowry-nitrogen-team
+CreationDate 2025-10-06
+Version 1.3.2-conda
+Description Singularity container for the MetaWRAP metagenomic binning, assembly, and refinement pipeline.
+
+%help
+This Singularity container provides the MetaWRAP pipeline (v1.3.2), which
+includes multiple binning algorithms (MaxBin2, MetaBAT2, CONCOCT) and
+refinement tools (CheckM, GTDB-tk) integrated into a single interface.
+
+The container is designed to be run directly with the 'metawrap' command.
+
+To use the primary MetaWRAP function, execute the container with the command:
+singularity exec metawrap.sif metawrap <module> <options>
+
+For example, to check the version:
+singularity exec metawrap.sif metawrap -v
+
+To run the binning module on an assembly:
+singularity exec metawrap.sif metawrap binning -o /path/to/output -t 8 ...
+
+You can also execute included tools directly, if needed:
+singularity exec metawrap.sif checkm -h
+singularity exec metawrap.sif gtdbtk -h

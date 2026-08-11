@@ -1,0 +1,83 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+# To build this container image, use the command below on a Linux machine with Singularity:
+# sudo singularity build vamb.sif vamb.def
+
+%environment
+    export LC_ALL=C
+    export LANG=C.UTF-8
+    export PATH=/opt/vamb-venv/bin:$PATH
+
+%post
+    set -e
+
+    # 1. Install Python 3.10 tooling and build dependencies
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        python3 \
+        python3-pip \
+        python3-venv \
+        build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # 2. Create an isolated environment (avoids linker and Conda cross-talk issues)
+    python3 -m venv /opt/vamb-venv
+
+    # 3. Install pinned VAMB release from PyPI
+    /opt/vamb-venv/bin/python -m pip install --upgrade pip setuptools wheel
+    /opt/vamb-venv/bin/python -m pip install --no-cache-dir vamb==5.0.4
+
+    # 4. Verify installed version and compare to latest release on PyPI
+    /opt/vamb-venv/bin/python - <<'PY'
+import json
+import urllib.request
+from importlib.metadata import version
+
+installed = version("vamb")
+with urllib.request.urlopen("https://pypi.org/pypi/vamb/json", timeout=20) as response:
+    latest = json.load(response)["info"]["version"]
+
+print(f"Installed vamb version: {installed}")
+print(f"Latest PyPI vamb version: {latest}")
+if installed != latest:
+    print("WARNING: Installed version differs from the latest PyPI release.")
+PY
+
+    # 5. Publish stable executable path
+    ln -sf /opt/vamb-venv/bin/vamb /usr/local/bin/vamb
+
+%runscript
+    exec /usr/local/bin/vamb "$@"
+
+%labels
+    Maintainer lowry-nitrogen-team
+    CreationDate 2026-04-07
+    BaseImage ubuntu:22.04
+    PythonVersion 3.10
+    VambVersion 5.0.4
+    Description Singularity container for VAMB installed via pip.
+
+%help
+This Singularity container provides VAMB v5.0.4 installed from PyPI via pip.
+
+Base image:
+    ubuntu:22.04
+
+Python compatibility:
+    VAMB v5.0.3 recommends Python >=3.10 and <3.14.
+
+Build example:
+    sudo singularity build vamb.sif vamb.def
+
+Usage examples:
+    singularity exec vamb.sif vamb --help
+    singularity run vamb.sif --help
+
+Notes:
+    - This image uses an isolated virtual environment at /opt/vamb-venv.
+    - Using a venv helps avoid Conda linker conflicts during pip installation.
