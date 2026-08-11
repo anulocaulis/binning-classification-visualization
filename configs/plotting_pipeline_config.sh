@@ -31,6 +31,7 @@ SEQUENCING_CLEAN_TSV="${PROJECT_ROOT}/sequencing_run_summary_stats_log_clean.tsv
 FULL_OUT_ROOT="${PROJECT_ROOT}/full_assembly"
 FILTERED_OUT_ROOT="${PROJECT_ROOT}/filtered_assembly"
 SUBSAMPLE_OUT_ROOT="${PROJECT_ROOT}/subsampling"
+PROJECT_REFINED_BIN_COUNTS_OUTDIR="${PROJECT_ROOT}/plots/refined_bin_counts"
 
 # Project-level validation metadata. Set to 0 to disable a check.
 EXPECTED_FULL_SAMPLE_COUNT="${PROJECT_EXPECTED_FULL_SAMPLE_COUNT}"
