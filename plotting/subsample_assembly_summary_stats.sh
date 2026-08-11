@@ -12,12 +12,16 @@
 # Usage:
 #   sbatch subsample_assembly_summary_stats.sh [SUBSAMPLING_DIR] [LOG_FILE]
 # Example:
-#   sbatch subsample_assembly_summary_stats.sh /storage/biology/projects/miller-lowry/beitner/data/subsampling subsample_assembly_summary_stats_log.txt
+#   sbatch subsample_assembly_summary_stats.sh /path/to/data/subsampling subsample_assembly_summary_stats_log.txt
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="${SLURM_SUBMIT_DIR:-$SCRIPT_DIR}"
+# shellcheck source=/dev/null
+if [[ -f "$SCRIPT_DIR/../configs/configs_master.conf" ]]; then
+  source "$SCRIPT_DIR/../configs/configs_master.conf"
+fi
 SUBSAMPLING_DIR="${1:-$BASE_DIR/../data/subsampling}"
 LOG_FILE="${2:-subsample_assembly_summary_stats_log.txt}"
 WORKDIR="$(pwd)"
@@ -25,10 +29,10 @@ CONTAINER=""
 
 container_candidates=(
   "${QC_TOOLS_CONTAINER:-}"
+  "${PROJECT_QC_TOOLS_CONTAINER:-}"
   "$BASE_DIR/containers/qc_tools_miniconda.sif"
   "$BASE_DIR/../containers/qc_tools_miniconda.sif"
   "$BASE_DIR/../Lowry-assemblies/containers/qc_tools_miniconda.sif"
-  "/storage/biology/projects/miller-lowry/beitner/Lowry-assemblies/containers/qc_tools_miniconda.sif"
 )
 
 for candidate in "${container_candidates[@]}"; do

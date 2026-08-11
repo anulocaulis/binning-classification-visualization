@@ -12,22 +12,29 @@
 # Usage:
 #   sbatch filter_subsampling_contigs_min_length.sh [SUBSAMPLING_ROOT]
 # Example:
-#   sbatch filter_subsampling_contigs_min_length.sh /storage/biology/projects/miller-lowry/beitner/data/subsampling
+#   sbatch filter_subsampling_contigs_min_length.sh /path/to/data/subsampling
 
 set -euo pipefail
 
 echo "Starting filter_subsampling_contigs_min_length at $(date)"
 
-WORKDIR="/storage/biology/projects/miller-lowry/beitner/assembly_stats"
-SUBSAMPLING_ROOT="${1:-/storage/biology/projects/miller-lowry/beitner/data/subsampling}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${SCRIPT_DIR}/../configs"
+if [[ -f "$CONFIG_DIR/configs_master.conf" ]]; then
+  # shellcheck source=/dev/null
+  source "$CONFIG_DIR/configs_master.conf"
+fi
+
+WORKDIR="${PROJECT_PLOTTING_ROOT:-$SCRIPT_DIR}"
+SUBSAMPLING_ROOT="${1:-${PROJECT_SUBSAMPLING_DIR:-$SCRIPT_DIR/../data/subsampling}}"
 CONTAINER_PATH=""
 
 container_candidates=(
   "${QC_TOOLS_CONTAINER:-}"
+  "${PROJECT_QC_TOOLS_CONTAINER:-}"
   "$WORKDIR/containers/qc_tools_miniconda.sif"
   "$WORKDIR/../containers/qc_tools_miniconda.sif"
-  "$WORKDIR/../Lowry-assemblies/containers/qc_tools_miniconda.sif"
-  "/storage/biology/projects/miller-lowry/beitner/Lowry-assemblies/containers/qc_tools_miniconda.sif"
+  "$SCRIPT_DIR/../containers/qc_tools_miniconda.sif"
 )
 
 for candidate in "${container_candidates[@]}"; do
@@ -48,7 +55,7 @@ if [[ ! -d "$SUBSAMPLING_ROOT" ]]; then
 fi
 
 mapfile -t assembly_files < <(
-  find "$SUBSAMPLING_ROOT" -type f -path '*/S1_subsample_*/assembly.*/*assembly.fasta' | sort -u
+  find "$SUBSAMPLING_ROOT" -type f -path '*/S*_subsample_*/assembly.*/*assembly.fasta' | sort -u
 )
 
 if [[ ${#assembly_files[@]} -eq 0 ]]; then

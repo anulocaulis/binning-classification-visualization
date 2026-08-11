@@ -5,13 +5,10 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=360G
 #SBATCH --time=4-00:00:00
-#SBATCH --output=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/binning_wrapper_%j.out
-#SBATCH --error=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/binning_wrapper_%j.err
+#SBATCH --output=logs/binning_wrapper_%j.out
+#SBATCH --error=logs/binning_wrapper_%j.err
 
 set -euo pipefail
-
-BASE_DIR="/storage/biology/projects/miller-lowry/beitner"
-WORK_DIR="${BASE_DIR}/binning-classification-wrapper"
 
 CONFIG_PATH=""
 BINNER_OVERRIDE=""

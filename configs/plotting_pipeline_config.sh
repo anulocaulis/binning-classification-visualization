@@ -3,17 +3,22 @@
 # Central configuration for run_plotting_pipeline.sh.
 # Adjust paths and counts here rather than editing the wrapper.
 
-PROJECT_ROOT="/storage/biology/projects/miller-lowry/beitner/assembly_stats"
+# shellcheck source=/dev/null
+CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$CONFIG_DIR/configs_master.conf"
+
+PROJECT_ROOT="${PROJECT_PLOTTING_ROOT}"
 
 # Container/runtime path used by stats/filtering scripts. Leave empty to let
 # individual scripts search their built-in candidate locations.
-QC_TOOLS_CONTAINER="/storage/biology/projects/miller-lowry/beitner/Lowry-assemblies/containers/qc_tools_miniconda.sif"
+QC_TOOLS_CONTAINER="${PROJECT_QC_TOOLS_CONTAINER}"
 
 # Input roots
-FULL_ASSEMBLIES_DIR="${PROJECT_ROOT}/../data/assemblies"
-GE1000_ASSEMBLIES_DIR="${PROJECT_ROOT}/../data/assemblies"
-SUBSAMPLING_DIR="${PROJECT_ROOT}/../data/subsampling"
-SEQUENCING_RUNS_DIR="${PROJECT_ROOT}/../data"
+FULL_ASSEMBLIES_DIR="${PROJECT_FULL_ASSEMBLIES_DIR}"
+GE1000_ASSEMBLIES_DIR="${PROJECT_GE1000_ASSEMBLIES_DIR}"
+SUBSAMPLING_DIR="${PROJECT_SUBSAMPLING_DIR}"
+SEQUENCING_RUNS_DIR="${PROJECT_SEQUENCING_RUNS_DIR}"
 
 # Core generated logs/tables
 FULL_SUMMARY_LOG="${PROJECT_ROOT}/summary_stats_log.txt"
@@ -28,9 +33,9 @@ FILTERED_OUT_ROOT="${PROJECT_ROOT}/filtered_assembly"
 SUBSAMPLE_OUT_ROOT="${PROJECT_ROOT}/subsampling"
 
 # Project-level validation metadata. Set to 0 to disable a check.
-EXPECTED_FULL_SAMPLE_COUNT=0
-EXPECTED_SUBSAMPLE_SAMPLE_COUNT=0
-EXPECTED_ASSEMBLER_COUNT=0
+EXPECTED_FULL_SAMPLE_COUNT="${PROJECT_EXPECTED_FULL_SAMPLE_COUNT}"
+EXPECTED_SUBSAMPLE_SAMPLE_COUNT="${PROJECT_EXPECTED_SUBSAMPLE_SAMPLE_COUNT}"
+EXPECTED_ASSEMBLER_COUNT="${PROJECT_EXPECTED_ASSEMBLER_COUNT}"
 
 # Global plotting style
 LONG_COLORS="#C6DBEF,#41B6C4,#08519C"

@@ -12,12 +12,16 @@
 # Usage:
 #   sbatch sequencing_run_summary_stats.sh [RUNS_DIR] [LOG_FILE] [CLEAN_TABLE_FILE]
 # Example:
-#   sbatch sequencing_run_summary_stats.sh /storage/biology/projects/miller-lowry/beitner/data sequencing_run_summary_stats_log.txt sequencing_run_summary_stats_clean.tsv
+#   sbatch sequencing_run_summary_stats.sh /path/to/data sequencing_run_summary_stats_log.txt sequencing_run_summary_stats_clean.tsv
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="${SLURM_SUBMIT_DIR:-$SCRIPT_DIR}"
+# shellcheck source=/dev/null
+if [[ -f "$SCRIPT_DIR/../configs/configs_master.conf" ]]; then
+  source "$SCRIPT_DIR/../configs/configs_master.conf"
+fi
 RUNS_DIR="${1:-$BASE_DIR/../data}"
 LOG_FILE="${2:-sequencing_run_summary_stats_log.txt}"
 if [[ "$LOG_FILE" == *.* ]]; then
@@ -31,10 +35,10 @@ CONTAINER=""
 
 container_candidates=(
   "${QC_TOOLS_CONTAINER:-}"
+  "${PROJECT_QC_TOOLS_CONTAINER:-}"
   "$BASE_DIR/containers/qc_tools_miniconda.sif"
   "$BASE_DIR/../containers/qc_tools_miniconda.sif"
   "$BASE_DIR/../Lowry-assemblies/containers/qc_tools_miniconda.sif"
-  "/storage/biology/projects/miller-lowry/beitner/Lowry-assemblies/containers/qc_tools_miniconda.sif"
 )
 
 for candidate in "${container_candidates[@]}"; do

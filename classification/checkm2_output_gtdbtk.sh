@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=360G
 #SBATCH --time=4-00:00:00
-#SBATCH --output=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/checkm2_output_gtdbtk_%j.out
-#SBATCH --error=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/checkm2_output_gtdbtk_%j.err
+#SBATCH --output=logs/checkm2_output_gtdbtk_%j.out
+#SBATCH --error=logs/checkm2_output_gtdbtk_%j.err
 
 set -euo pipefail
 
@@ -18,17 +18,24 @@ set -euo pipefail
 #   sbatch scripts/checkm2_output_gtdbtk.sh <CHECKM2_INPUT_1> [CHECKM2_INPUT_2 ...]
 #   sbatch scripts/checkm2_output_gtdbtk.sh <CHECKM2_INPUT_1> [CHECKM2_INPUT_2 ...] --out-root <OUT_ROOT> --gtdbtk-db <GTDBTK_DB>
 
-BASE_DIR="/storage/biology/projects/miller-lowry/beitner"
-WORK_DIR="${BASE_DIR}/binning-classification-wrapper"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${SCRIPT_DIR}/../configs"
+if [[ -f "$CONFIG_DIR/configs_master.conf" ]]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_DIR/configs_master.conf"
+fi
+
+BASE_DIR="${PROJECT_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+WORK_DIR="${PROJECT_WORK_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DATA_DIR="${PROJECT_DATA_DIR:-${BASE_DIR}/data}"
 
 DEFAULT_INPUTS=(
-    "${BASE_DIR}/data/binning_outputs/checkm2_refined_bins"
-    "${BASE_DIR}/data/binning_outputs/checkm2_vamb_bins_full"
+    "${DATA_DIR}/binning_outputs/checkm2_refined_bins"
+    "${DATA_DIR}/binning_outputs/checkm2_vamb_bins_full"
 )
 CHECKM2_INPUTS=()
-OUT_ROOT="${BASE_DIR}/data/binning_outputs/gtdbtk_checkm2_all"
+OUT_ROOT="${DATA_DIR}/binning_outputs/gtdbtk_checkm2_all"
 GTDBTK_DB="${BASE_DIR}/databases/gtdbtk_db"
-DATA_DIR="${BASE_DIR}/data"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -48,8 +55,8 @@ Usage:
 Examples:
   sbatch scripts/checkm2_output_gtdbtk.sh
   sbatch scripts/checkm2_output_gtdbtk.sh \
-    /storage/biology/projects/miller-lowry/beitner/data/binning_outputs/checkm2_refined_bins \
-    /storage/biology/projects/miller-lowry/beitner/data/binning_outputs/checkm2_vamb_bins
+        /path/to/data/binning_outputs/checkm2_refined_bins \
+        /path/to/data/binning_outputs/checkm2_vamb_bins
 EOF
             exit 0
             ;;

@@ -19,16 +19,41 @@ set -euo pipefail
 
 echo "Starting filter_contigs_min_length at $(date)"
 
-WORKDIR="/storage/biology/projects/miller-lowry/beitner/metagenomic-multi-assembly-wrapper"
-CONTAINER_PATH="${WORKDIR}/containers/qc_tools_miniconda.sif"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${SCRIPT_DIR}/../configs"
+if [[ -f "$CONFIG_DIR/configs_master.conf" ]]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_DIR/configs_master.conf"
+fi
+
+WORKDIR="${PROJECT_PLOTTING_ROOT:-$SCRIPT_DIR}"
+ASSEMBLIES_ROOT="${PROJECT_FULL_ASSEMBLIES_DIR:-$SCRIPT_DIR/../data/assemblies}"
+CONTAINER_PATH=""
 THREADS="${SLURM_CPUS_PER_TASK:-16}"
 
-cd "${WORKDIR}"
+container_candidates=(
+    "${QC_TOOLS_CONTAINER:-}"
+    "${PROJECT_QC_TOOLS_CONTAINER:-}"
+    "$SCRIPT_DIR/../containers/qc_tools_miniconda.sif"
+    "$SCRIPT_DIR/containers/qc_tools_miniconda.sif"
+)
+
+for candidate in "${container_candidates[@]}"; do
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+        CONTAINER_PATH="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$CONTAINER_PATH" ]]; then
+    echo "Container not found. Set QC_TOOLS_CONTAINER or PROJECT_QC_TOOLS_CONTAINER, or place qc_tools_miniconda.sif in containers/." >&2
+    exit 1
+fi
 
 resolve_input_contigs() {
     local sample="$1"
     local assembler="$2"
-    local base="${WORKDIR}/assemblies/${sample}/assembly.${assembler}"
+        local base="${ASSEMBLIES_ROOT}/${sample}/assembly.${assembler}"
 
     if [[ "${assembler}" == "metamdbg" ]]; then
         if [[ -s "${base}/metamdbg.contigs.fasta" ]]; then
@@ -88,7 +113,7 @@ run_filter() {
         return 0
     fi
 
-    local output_filtered="${WORKDIR}/assemblies/${sample}/assembly.${assembler}/contigs.ge1000.fa"
+    local output_filtered="${ASSEMBLIES_ROOT}/${sample}/assembly.${assembler}/contigs.ge1000.fa"
 
     if [[ -s "${output_filtered}" ]]; then
         echo "Skipping ${sample}/${assembler}: output already exists" >&2
@@ -100,7 +125,7 @@ run_filter() {
     echo "Input:  ${input_contigs}"
     echo "Output: ${output_filtered}"
 
-    singularity exec -B "$PWD" "${CONTAINER_PATH}" reformat.sh \
+    singularity exec -B "${ASSEMBLIES_ROOT}:${ASSEMBLIES_ROOT}" "${CONTAINER_PATH}" reformat.sh \
         in="${input_contigs}" \
         out="${output_filtered}" \
         minlength=1000
@@ -110,13 +135,13 @@ if [[ $# -eq 2 ]]; then
     run_filter "$1" "$2"
 elif [[ $# -eq 0 ]]; then
     mapfile -t targets < <(
-        find "${WORKDIR}/assemblies" -maxdepth 3 -type d -name "assembly.*" \
+        find "${ASSEMBLIES_ROOT}" -maxdepth 3 -type d -name "assembly.*" \
             | sed -E 's#.*/assemblies/([^/]+)/assembly\.([^/]+)#\1 \2#' \
             | sort -u
     )
 
     if [[ ${#targets[@]} -eq 0 ]]; then
-        echo "No assembly.* directories found under ${WORKDIR}/assemblies" >&2
+        echo "No assembly.* directories found under ${ASSEMBLIES_ROOT}" >&2
         exit 1
     fi
 

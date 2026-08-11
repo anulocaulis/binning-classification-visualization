@@ -43,12 +43,12 @@
 # Usage:
 #   sbatch run_plotting_pipeline.sh [CONFIG_FILE]
 # Example:
-#   sbatch run_plotting_pipeline.sh plotting_pipeline_config.sh
+#   sbatch run_plotting_pipeline.sh ../configs/plotting_pipeline_config.sh
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_PATH="${1:-$SCRIPT_DIR/plotting_pipeline_config.sh}"
+CONFIG_PATH="${1:-$SCRIPT_DIR/../configs/plotting_pipeline_config.sh}"
 
 if [[ ! -f "$CONFIG_PATH" ]]; then
   echo "Config file not found: $CONFIG_PATH" >&2

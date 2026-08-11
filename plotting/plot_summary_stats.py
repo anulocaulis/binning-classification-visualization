@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# This script provides utility functions for parsing and plotting summary statistics of sequencing assemblies.
+
+# Imports
 import argparse
 import base64
 from html import escape
@@ -12,7 +15,7 @@ import matplotlib.ticker as mticker
 import pandas as pd
 import seaborn as sns
 
-
+# Constants and mappings for assembly types, colors, and assembler labels
 ASSEMBLER_TO_ASSEMBLY_TYPE = {
     "flye": "long_read",
     "metamdbg": "long_read",
@@ -49,7 +52,8 @@ ASSEMBLER_LABEL_ALIASES = {
     "final": "Final",
 }
 
-
+### Dataframes from BBStats
+# Functions for sorting, color mapping, and parsing assembly/sample statistics
 def assembler_sort_key(assembler: str):
     assembly_type = classify_assembly_type(assembler)
     type_rank = ASSEMBLY_TYPE_ORDER.index(assembly_type) if assembly_type in ASSEMBLY_TYPE_ORDER else len(ASSEMBLY_TYPE_ORDER)
@@ -80,7 +84,7 @@ def sample_sort_key(sample: object):
         return (0, sample_num, subsample_num, text)
     return (1, text)
 
-
+# Functions for parsing sizes and thresholds
 def parse_size_to_mb(text: str) -> Optional[float]:
     match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(Mbp|Mb|Kbp|Kb|bp)", text)
     if not match:
@@ -130,7 +134,7 @@ def parse_bp_threshold_to_kbp(label: str) -> Optional[float]:
     # minimum lengths, not kilobases.
     return value / 1000.0
 
-
+# Functions for parsing assembly metadata and classifying assembly types, consistently pulling assembly outputs with different name conventions
 def parse_assembly_meta(path: str) -> Dict[str, Optional[str]]:
     m = re.search(r"/assemblies/(S\d+)/assembly\.([^/]+)/", path)
     if m:
@@ -179,7 +183,7 @@ def extract_gc(lines: List[str]) -> Optional[float]:
                         return None
     return None
 
-
+# Functions for parsing assembly summary blocks into structured dictionaries
 def parse_block(block: str) -> Optional[Dict[str, object]]:
     lines = [line.rstrip("\n") for line in block.splitlines() if line.strip()]
     if not lines:
@@ -246,7 +250,7 @@ def parse_block(block: str) -> Optional[Dict[str, object]]:
 
     return values
 
-
+# Functions for parsing threshold rows from assembly summary blocks
 def parse_threshold_rows(block: str) -> List[Dict[str, object]]:
     lines = [line.rstrip("\n") for line in block.splitlines()]
     sample_line = next((line for line in lines if line.strip().startswith("Sample:")), None)
@@ -352,7 +356,7 @@ def parse_threshold_stats_log(log_path: str) -> pd.DataFrame:
         rows.extend(parse_threshold_rows(block))
     return pd.DataFrame(rows)
 
-
+# Functions for adding derived statistics to DataFrames
 def add_percent_of_best(
     df: pd.DataFrame,
     value_col: str,
@@ -376,7 +380,8 @@ def add_percent_of_best(
     result.loc[result[value_col] <= 0, out_col] = pd.NA
     return result
 
-
+#### FASTA Contig Statistics
+# Functions for handling FASTA files and calculating N50/NG50 statistics
 def _open_text_maybe_gzip(path: str):
     if path.lower().endswith(".gz"):
         return gzip.open(path, "rt", encoding="utf-8", errors="replace")
@@ -416,7 +421,7 @@ def _nx(lengths: Sequence[int], cutoff_bp: int) -> Tuple[Optional[int], Optional
             return length, idx
     return None, None
 
-
+# Functions for calculating NG50 and related contig statistics from FASTA files. Change the NG50 target size in the config file 'configs_master.conf' if needed.
 def add_recalculated_ng50(df: pd.DataFrame, target_genome_bp: int = DEFAULT_NG50_TARGET_BP) -> pd.DataFrame:
     result = df.copy()
     if result.empty or "assembly_path" not in result.columns or target_genome_bp <= 0:
@@ -499,7 +504,7 @@ def _combined_subsample_curve_specs() -> List[Dict[str, str]]:
         ],
     ]
 
-
+# Functions for parsing cumulative contig length curves from assembly logs
 def _parse_contig_curve_log_rows(log_path: str, sample_names: Sequence[str]) -> Dict[Tuple[str, str], Dict[str, object]]:
     if not os.path.isfile(log_path):
         return {}
@@ -540,7 +545,8 @@ def _parse_contig_curve_log_rows(log_path: str, sample_names: Sequence[str]) -> 
 
     return rows
 
-
+### Plotting Functions for Subsample Cumulative Contig Curves
+# Make subsample cumulative contig plot from reference and subsample assembly FASTA dataframes
 def make_subsample_cumulative_contig_plot(outdir: str, reference_log: str = "summary_stats_log.txt", subsample_log: str = "subsample_assembly_summary_stats_log.txt") -> Optional[str]:
     os.makedirs(outdir, exist_ok=True)
 
@@ -599,7 +605,7 @@ def make_subsample_cumulative_contig_plot(outdir: str, reference_log: str = "sum
     plt.close(fig)
     return outpath
 
-
+# Main plotting function for generating BBStats summary plots
 def make_plots(df: pd.DataFrame, threshold_df: pd.DataFrame, outdir: str) -> None:
     os.makedirs(outdir, exist_ok=True)
     sns.set_context("notebook")
@@ -1190,7 +1196,7 @@ def make_plots(df: pd.DataFrame, threshold_df: pd.DataFrame, outdir: str) -> Non
 
     plt.close()
 
-
+### Function for writing an embedded HTML report of plots
 def write_embedded_html_report(
     outdir: str,
     report_filename: str = "report.html",
@@ -1272,7 +1278,7 @@ def write_embedded_html_report(
 
     return report_path
 
-
+### Main function for command-line interface
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot assembly stats from summary_stats_log.txt")
     parser.add_argument("--log", default="summary_stats_log.txt", help="Path to summary stats log")

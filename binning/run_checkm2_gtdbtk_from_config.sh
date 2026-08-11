@@ -5,15 +5,14 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=360G
 #SBATCH --time=4-00:00:00
-#SBATCH --output=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/checkm2_gtdbtk_wrapper_%j.out
-#SBATCH --error=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/checkm2_gtdbtk_wrapper_%j.err
+#SBATCH --output=logs/checkm2_gtdbtk_wrapper_%j.out
+#SBATCH --error=logs/checkm2_gtdbtk_wrapper_%j.err
 
 set -euo pipefail
 
-BASE_DIR="/storage/biology/projects/miller-lowry/beitner"
-WORK_DIR="${BASE_DIR}/binning-classification-wrapper"
-
-DEFAULT_CONFIG="${WORK_DIR}/scripts/configs/checkm2_gtdbtk_wrapper.conf"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${SCRIPT_DIR}/../configs"
+DEFAULT_CONFIG="${CONFIG_DIR}/checkm2_gtdbtk_wrapper.conf"
 CONFIG_PATH="$DEFAULT_CONFIG"
 
 SAMPLE_NAME_OVERRIDE=""
@@ -27,7 +26,7 @@ Usage:
   bash scripts/run_checkm2_gtdbtk_from_config.sh [options]
 
 Options:
-  --config PATH              Config file (default: scripts/configs/checkm2_gtdbtk_wrapper.conf)
+    --config PATH              Config file (default: configs/checkm2_gtdbtk_wrapper.conf)
   --sample NAME              Run only one sample by name (e.g., S1)
   --sample-number N          Run only one sample by 1-based index from config SAMPLES array
   --assembly NAME            Run only one assembly by name (e.g., flye)

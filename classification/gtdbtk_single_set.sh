@@ -5,14 +5,21 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=360G
 #SBATCH --time=4-00:00:00
-#SBATCH --output=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/gtdbtk_single_set_%j.out
-#SBATCH --error=/storage/biology/projects/miller-lowry/beitner/binning-classification-wrapper/slurm_logs/gtdbtk_single_set_%j.err
+#SBATCH --output=logs/gtdbtk_single_set_%j.out
+#SBATCH --error=logs/gtdbtk_single_set_%j.err
 
 set -euo pipefail
 
-BASE_DIR="/storage/biology/projects/miller-lowry/beitner"
-WORK_DIR="${BASE_DIR}/binning-classification-wrapper"
-DATA_DIR="${BASE_DIR}/data"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${SCRIPT_DIR}/../configs"
+if [[ -f "$CONFIG_DIR/configs_master.conf" ]]; then
+    # shellcheck source=/dev/null
+    source "$CONFIG_DIR/configs_master.conf"
+fi
+
+BASE_DIR="${PROJECT_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+WORK_DIR="${PROJECT_WORK_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DATA_DIR="${PROJECT_DATA_DIR:-${BASE_DIR}/data}"
 
 ASSEMBLY=""
 SAMPLE=""
