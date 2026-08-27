@@ -2,9 +2,9 @@
 #SBATCH --job-name=binning_wrapper
 #SBATCH --partition=math-alderaan
 #SBATCH --account=biology-miller-annotation
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=360G
-#SBATCH --time=4-00:00:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --time=0-01:00:00
 #SBATCH --output=logs/binning_wrapper_%j.out
 #SBATCH --error=logs/binning_wrapper_%j.err
 
@@ -20,7 +20,7 @@ ASSEMBLY_NUMBER_OVERRIDE=""
 usage() {
     cat <<EOF
 Usage:
-  bash scripts/run_binning_experiment_common.sh --config PATH [options]
+    bash binning/run_binning_experiment_common.sh --config PATH [options]
 
 Options:
   --binner NAME         metawrap or vamb (override config BINNER)
@@ -180,10 +180,45 @@ expand_template() {
     printf '%s\n' "$out"
 }
 
+resolve_assembly_template() {
+    local assembly="$1"
+    local key override_var
+
+    key="$(printf '%s' "$assembly" | tr '[:lower:]-.' '[:upper:]__')"
+    override_var="ASSEMBLY_TEMPLATE_${key}"
+
+    if [[ -n "${!override_var:-}" ]]; then
+        printf '%s\n' "${!override_var}"
+    else
+        printf '%s\n' "$ASSEMBLY_TEMPLATE"
+    fi
+}
+
+resolve_read_sample_token() {
+    local token="$1"
+    local target_sample="$2"
+
+    if [[ "$token" == "__TARGET_SAMPLE__" ]]; then
+        printf '%s\n' "$target_sample"
+    else
+        printf '%s\n' "$token"
+    fi
+}
+
+READ_SAMPLES_SHORT_DEFAULT=()
+READ_SAMPLES_LONG_DEFAULT=()
+
+# Backward compatibility: READ_SAMPLES applies to both read types unless
+# per-type arrays are provided.
 if [[ -n "${READ_SAMPLES+x}" && "${#READ_SAMPLES[@]}" -gt 0 ]]; then
-    READ_SAMPLES_DEFAULT=("${READ_SAMPLES[@]}")
-else
-    READ_SAMPLES_DEFAULT=()
+    READ_SAMPLES_SHORT_DEFAULT=("${READ_SAMPLES[@]}")
+    READ_SAMPLES_LONG_DEFAULT=("${READ_SAMPLES[@]}")
+fi
+if [[ -n "${READ_SAMPLES_SHORT+x}" && "${#READ_SAMPLES_SHORT[@]}" -gt 0 ]]; then
+    READ_SAMPLES_SHORT_DEFAULT=("${READ_SAMPLES_SHORT[@]}")
+fi
+if [[ -n "${READ_SAMPLES_LONG+x}" && "${#READ_SAMPLES_LONG[@]}" -gt 0 ]]; then
+    READ_SAMPLES_LONG_DEFAULT=("${READ_SAMPLES_LONG[@]}")
 fi
 
 mkdir -p "$OUTPUT_ROOT"
@@ -194,7 +229,8 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
     sample_lower="$(printf '%s' "$sample" | tr '[:upper:]' '[:lower:]')"
     for assembly in "${ASSEMBLIES_RUN[@]}"; do
         set_name="${assembly}_${sample_lower}_${SET_SUFFIX}"
-        assembly_fasta="$(expand_template "$ASSEMBLY_TEMPLATE" "$assembly" "$sample" "$sample_lower" "$SET_SUFFIX")"
+        assembly_template_use="$(resolve_assembly_template "$assembly")"
+        assembly_fasta="$(expand_template "$assembly_template_use" "$assembly" "$sample" "$sample_lower" "$SET_SUFFIX")"
 
         if [[ ! -f "$assembly_fasta" ]]; then
             printf '%s\t%s\t%s\t%s\t%s\t%s\t0\t0\t%s\t%s\tskipped\tassembly_missing\n' \
@@ -202,26 +238,40 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
             continue
         fi
 
-        read_samples=()
+        read_samples_short=()
+        read_samples_long=()
         if [[ "$COBINNING_MODE" == "1" ]]; then
-            if [[ "${#READ_SAMPLES_DEFAULT[@]}" -eq 0 ]]; then
-                echo "ERROR: COBINNING_MODE=1 requires READ_SAMPLES array in config" >&2
+            if [[ "${#READ_SAMPLES_SHORT_DEFAULT[@]}" -eq 0 && "${#READ_SAMPLES_LONG_DEFAULT[@]}" -eq 0 ]]; then
+                echo "ERROR: COBINNING_MODE=1 requires read sample arrays in config" >&2
                 exit 1
             fi
-            read_samples=("${READ_SAMPLES_DEFAULT[@]}")
+            read_samples_short=("${READ_SAMPLES_SHORT_DEFAULT[@]}")
+            read_samples_long=("${READ_SAMPLES_LONG_DEFAULT[@]}")
         else
-            read_samples=("$sample")
+            read_samples_short=("$sample")
+            read_samples_long=("$sample")
         fi
+
+        for i in "${!read_samples_short[@]}"; do
+            read_samples_short[$i]="$(resolve_read_sample_token "${read_samples_short[$i]}" "$sample")"
+        done
+        for i in "${!read_samples_long[@]}"; do
+            read_samples_long[$i]="$(resolve_read_sample_token "${read_samples_long[$i]}" "$sample")"
+        done
 
         short_reads=()
         long_reads=()
-        for read_sample in "${read_samples[@]}"; do
+        for read_sample in "${read_samples_short[@]}"; do
             read_sample_lower="$(printf '%s' "$read_sample" | tr '[:upper:]' '[:lower:]')"
 
             sr_path="$(expand_template "$SHORT_READ_TEMPLATE" "$assembly" "$read_sample" "$read_sample_lower" "$SET_SUFFIX")"
             if [[ -f "$sr_path" ]]; then
                 short_reads+=("$sr_path")
             fi
+        done
+
+        for read_sample in "${read_samples_long[@]}"; do
+            read_sample_lower="$(printf '%s' "$read_sample" | tr '[:upper:]' '[:lower:]')"
 
             lr_path="$(expand_template "$LONG_READ_TEMPLATE" "$assembly" "$read_sample" "$read_sample_lower" "$SET_SUFFIX")"
             if [[ -f "$lr_path" ]]; then
@@ -237,7 +287,12 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
 
         if [[ "$BINNER" == "metawrap" ]]; then
             cmd=(
-                bash "$METAWRAP_BINNER_SCRIPT"
+                sbatch
+                "--job-name=${EXPERIMENT_NAME}_${set_name}"
+                "--cpus-per-task=$CPUS"
+                "--mem=${MEM_GB}G"
+                "--time=4-00:00:00"
+                "$METAWRAP_BINNER_SCRIPT"
                 --assembly-name "$assembly"
                 --sample "$sample"
                 --set-name "$set_name"
@@ -251,7 +306,12 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
             for r in "${long_reads[@]}"; do cmd+=(--long-read "$r"); done
         else
             cmd=(
-                bash "$VAMB_BINNER_SCRIPT"
+                sbatch
+                "--job-name=${EXPERIMENT_NAME}_${set_name}"
+                "--cpus-per-task=$CPUS"
+                "--mem=${MEM_GB}G"
+                "--time=4-00:00:00"
+                "$VAMB_BINNER_SCRIPT"
                 --assembly-name "$assembly"
                 --sample "$sample"
                 --set-name "$set_name"
@@ -266,32 +326,19 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
             for r in "${long_reads[@]}"; do cmd+=(--long-read "$r"); done
         fi
 
-        if "${cmd[@]}"; then
-            if [[ "$BINNER" == "metawrap" ]]; then
-                bin_fasta_dir="${OUTPUT_ROOT}/metawrap/${set_name}/bin_fasta"
-            else
-                bin_fasta_dir="${OUTPUT_ROOT}/vamb/${set_name}/bin_fasta"
-            fi
+        job_output=$("${cmd[@]}" 2>&1)
+        job_id=$(echo "$job_output" | grep -oP 'Submitted batch job \K[0-9]+' || echo "")
 
-            if [[ -d "$bin_fasta_dir" ]]; then
-                bin_fasta_bins="$(find "$bin_fasta_dir" -maxdepth 1 \( -type f -o -type l \) -name '*.fa' | wc -l)"
-            else
-                bin_fasta_bins=0
-            fi
-
-            if [[ "$bin_fasta_bins" -gt 0 ]]; then
-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tcompleted\tok\n' \
-                    "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
-                    "${#short_reads[@]}" "${#long_reads[@]}" "$bin_fasta_dir" "$bin_fasta_bins" >> "$RUN_LOG"
-            else
-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\tmissing_bin_fasta_dir\n' \
-                    "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
-                    "${#short_reads[@]}" "${#long_reads[@]}" "$bin_fasta_dir" "$bin_fasta_bins" >> "$RUN_LOG"
-            fi
+        if [[ -n "$job_id" ]]; then
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tsubmitted\tjob_%s\n' \
+                "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
+                "${#short_reads[@]}" "${#long_reads[@]}" "" "" "$job_id" >> "$RUN_LOG"
         else
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\tbinner_failed\n' \
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\tsubmission_failed\n' \
                 "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
                 "${#short_reads[@]}" "${#long_reads[@]}" "" "0" >> "$RUN_LOG"
+            echo "ERROR: sbatch submission failed for $set_name" >&2
+            echo "Output: $job_output" >&2
         fi
     done
 done

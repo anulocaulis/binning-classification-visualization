@@ -1,0 +1,63 @@
+# SLURM and job logs
+logs/
+slurm_logs/
+*.out
+*.err
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Large data directories (preserve configs)
+data/
+!data/README.md
+
+# Build outputs
+plots/
+output/
+results/
+
+# Singularity containers (keep defs, exclude built images)
+*.sif
+!*.def
+
+# Temporary files
+*.tmp
+*.temp
+.*.swp

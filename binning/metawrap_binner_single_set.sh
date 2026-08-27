@@ -7,18 +7,22 @@
 #SBATCH --time=4-00:00:00
 #SBATCH --output=logs/metawrap_binner_set_%j.out
 #SBATCH --error=logs/metawrap_binner_set_%j.err
+#SBATCH --chdir=/storage/biology/projects/miller-lowry/beitner/binning-classification-visualization
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${SCRIPT_DIR}/../configs"
+# Use absolute paths to work correctly with sbatch
+PROJECT_ROOT="/storage/biology/projects/miller-lowry/beitner"
+BINNING_DIR="${PROJECT_ROOT}/binning-classification-visualization/binning"
+CONFIG_DIR="${PROJECT_ROOT}/binning-classification-visualization/configs"
+
 if [[ -f "$CONFIG_DIR/configs_master.conf" ]]; then
     # shellcheck source=/dev/null
     source "$CONFIG_DIR/configs_master.conf"
 fi
 
-BASE_DIR="${PROJECT_BASE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-WORK_DIR="${PROJECT_WORK_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+BASE_DIR="${PROJECT_BASE_DIR:-$PROJECT_ROOT}"
+WORK_DIR="${PROJECT_WORK_DIR:-${PROJECT_ROOT}/binning-classification-visualization}"
 
 ASSEMBLY_NAME=""
 SAMPLE=""
@@ -174,6 +178,8 @@ fi
 
 rm -rf "$RUN_DIR"
 mkdir -p "$RUN_DIR"
+
+echo "[$(date)] Starting metaWRAP binning for $SET_NAME"
 
 singularity exec "$METAWRAP_CONTAINER" metawrap binning \
     -a "$ASSEMBLY_FASTA" \

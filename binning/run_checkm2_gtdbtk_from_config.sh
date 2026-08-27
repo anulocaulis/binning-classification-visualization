@@ -23,7 +23,7 @@ ASSEMBLY_NUMBER_OVERRIDE=""
 usage() {
     cat <<EOF
 Usage:
-  bash scripts/run_checkm2_gtdbtk_from_config.sh [options]
+    bash binning/run_checkm2_gtdbtk_from_config.sh [options]
 
 Options:
     --config PATH              Config file (default: configs/checkm2_gtdbtk_wrapper.conf)
