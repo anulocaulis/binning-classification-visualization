@@ -14,6 +14,7 @@ from plot_rarefaction import plot_rarefaction
 from plot_rarefaction_variants import (
     plot_rarefaction_loglog,
     plot_rarefaction_linear,
+    plot_rarefaction_logx_lineary,
     plot_rarefaction_logx_lineary_first100,
 )
 from plot_n50_scatter import plot_n50_l50_scatter
@@ -60,8 +61,8 @@ Examples:
     )
     parser.add_argument(
         "--log-path",
-        default="ge1000_summary_stats.txt",
-        help="Path to summary stats log file (relative to plotting dir)",
+        default="rarefaction_curves.csv",
+        help="Path to rarefaction curves CSV file (relative to plotting dir)",
     )
     parser.add_argument(
         "--samples",
@@ -89,8 +90,8 @@ Examples:
     
     try:
         summary_df, threshold_df = load_summary_and_threshold_data(args.log_path)
-        print(f"✓ Loaded {len(summary_df)} summary records")
-        print(f"✓ Loaded {len(threshold_df)} threshold records")
+        print(f"✓ Loaded {len(summary_df)} rarefaction records")
+        print(f"  (from {len(summary_df['assembler'].unique())} assembler×sample combinations)")
     except ValueError as e:
         print(f"Error loading data: {e}", file=sys.stderr)
         sys.exit(1)
@@ -113,15 +114,30 @@ Examples:
             print(f"✗ Rarefaction plot failed: {e}", file=sys.stderr)
     
     if "rarefaction_variants" in args.plots:
-        # Generate three variants per sample
+        # Generate log-log and linear variants
         for variant_name, plot_func in [
             ("loglog", plot_rarefaction_loglog),
             ("linear", plot_rarefaction_linear),
-            ("logx_lineary", plot_rarefaction_logx_lineary_first100),
         ]:
             outpath = os.path.join(args.outdir, f"rarefaction_{variant_name}_{args.theme}.png")
             try:
                 plot_func(summary_df, samples=args.samples, outpath=outpath, theme=args.theme)
+                plot_count += 1
+            except Exception as e:
+                print(f"✗ Rarefaction {variant_name} plot failed: {e}", file=sys.stderr)
+        
+        # Generate shoulder-detection log-x linear-y variants at different contig thresholds
+        for contig_limit in [100, 200, 500, 1000]:
+            variant_name = f"logx_lineary_first{contig_limit}"
+            outpath = os.path.join(args.outdir, f"rarefaction_{variant_name}_{args.theme}.png")
+            try:
+                plot_rarefaction_logx_lineary(
+                    summary_df,
+                    first_n_contigs=contig_limit,
+                    samples=args.samples,
+                    outpath=outpath,
+                    theme=args.theme,
+                )
                 plot_count += 1
             except Exception as e:
                 print(f"✗ Rarefaction {variant_name} plot failed: {e}", file=sys.stderr)

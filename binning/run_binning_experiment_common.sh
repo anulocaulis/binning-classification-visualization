@@ -77,6 +77,41 @@ fi
 # shellcheck source=/dev/null
 source "$CONFIG_PATH"
 
+# Classify assembly type based on assembler name
+classify_assembly_type() {
+    local assembler="$1"
+    case "$assembler" in
+        flye|idbaud)
+            echo "long_read"
+            ;;
+        metawrap|megahit)
+            echo "short_read"
+            ;;
+        metaspades_hybrid|metamdbg|opera_ms)
+            echo "hybrid_read"
+            ;;
+        *)
+            echo "short_read"  # Default to short_read for unknown
+            ;;
+    esac
+}
+
+# Select binner based on assembly type
+select_binner_for_assembly() {
+    local assembly="$1"
+    local config_binner="${BINNER_OVERRIDE:-$BINNER}"
+    local assembly_type
+    
+    assembly_type="$(classify_assembly_type "$assembly")"
+    
+    # Use VAMB for long and hybrid reads, metawrap for short reads
+    if [[ "$assembly_type" == "long_read" || "$assembly_type" == "hybrid_read" ]]; then
+        echo "vamb"
+    else
+        echo "$config_binner"
+    fi
+}
+
 required_vars=(
     EXPERIMENT_NAME
     BINNER
@@ -113,9 +148,12 @@ fi
 if [[ -n "$BINNER_OVERRIDE" ]]; then
     BINNER="$BINNER_OVERRIDE"
 fi
-if [[ "$BINNER" != "metawrap" && "$BINNER" != "vamb" ]]; then
-    echo "ERROR: BINNER must be metawrap or vamb" >&2
-    exit 1
+# Note: BINNER can be metawrap or vamb, but actual selection per assembly is done below
+if [[ "${BINNER_OVERRIDE:-}" != "" ]]; then
+    if [[ "$BINNER_OVERRIDE" != "metawrap" && "$BINNER_OVERRIDE" != "vamb" ]]; then
+        echo "ERROR: BINNER_OVERRIDE must be metawrap or vamb" >&2
+        exit 1
+    fi
 fi
 
 CPUS="${CPUS:-${SLURM_CPUS_PER_TASK:-32}}"
@@ -280,12 +318,16 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
         done
 
         if [[ "${#short_reads[@]}" -eq 0 && "${#long_reads[@]}" -eq 0 ]]; then
+            actual_binner="$(select_binner_for_assembly "$assembly")"
             printf '%s\t%s\t%s\t%s\t%s\t%s\t0\t0\t%s\t%s\tskipped\tno_reads_found\n' \
-                "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" "" "" >> "$RUN_LOG"
+                "$EXPERIMENT_NAME" "$actual_binner" "$assembly" "$sample" "$set_name" "$assembly_fasta" "" "" >> "$RUN_LOG"
             continue
         fi
 
-        if [[ "$BINNER" == "metawrap" ]]; then
+        # Select binner based on assembly type
+        actual_binner="$(select_binner_for_assembly "$assembly")"
+
+        if [[ "$actual_binner" == "metawrap" ]]; then
             cmd=(
                 sbatch
                 "--job-name=${EXPERIMENT_NAME}_${set_name}"
@@ -331,11 +373,11 @@ for sample in "${TARGET_SAMPLES_RUN[@]}"; do
 
         if [[ -n "$job_id" ]]; then
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tsubmitted\tjob_%s\n' \
-                "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
+                "$EXPERIMENT_NAME" "$actual_binner" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
                 "${#short_reads[@]}" "${#long_reads[@]}" "" "" "$job_id" >> "$RUN_LOG"
         else
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\tsubmission_failed\n' \
-                "$EXPERIMENT_NAME" "$BINNER" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
+                "$EXPERIMENT_NAME" "$actual_binner" "$assembly" "$sample" "$set_name" "$assembly_fasta" \
                 "${#short_reads[@]}" "${#long_reads[@]}" "" "0" >> "$RUN_LOG"
             echo "ERROR: sbatch submission failed for $set_name" >&2
             echo "Output: $job_output" >&2

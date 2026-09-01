@@ -53,6 +53,14 @@ plots/
 output/
 results/
 
+# Generated data files (produced by scripts, not source)
+*_summary_stats.txt
+rarefaction_curves.csv
+*_summary.csv
+*_curves.csv
+*.log.tsv
+*_run_log.tsv
+
 # Singularity containers (keep defs, exclude built images)
 *.sif
 !*.def
